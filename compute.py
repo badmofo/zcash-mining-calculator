@@ -53,7 +53,7 @@ top = service.getblock(service.getblockhash(height))
 net_hash = service.getnetworkhashps(72)
 top_minus_72 = service.getblock(service.getblockhash(height - 72))
 block_time = (top['time'] - top_minus_72['time']) / 72
-miner_subsidy = service.getblocksubsidy(100)['miner']
+miner_subsidy = service.getblocksubsidy(height)['miner']
 poloniex = requests.get('https://poloniex.com/public?command=returnTicker').json()
 from decimal import Decimal
 data = {
