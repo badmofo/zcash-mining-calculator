@@ -110,6 +110,31 @@
                 ng-change="computeProfits()"/>
             </div>
           </div>
+
+          <div class="form-group">
+            <label class="col-lg-5 control-label">Chain Height</label>
+            <div class="col-lg-7">
+              <input 
+                type="text" 
+                class="form-control" 
+                ng-model="height" 
+                placeholder="Chain Height"
+                ng-change="computeProfits()"/>
+            </div>
+          </div>
+
+          <div class="form-group">
+            <label class="col-lg-5 control-label">Miner Subsidy</label>
+            <div class="col-lg-7">
+              <input 
+                type="text" 
+                class="form-control" 
+                ng-model="minerSubsidy" 
+                placeholder="Miner Subsidy"
+                ng-change="computeProfits()"/>
+            </div>
+          </div>
+
         </form>
         <p class="text-muted">
           *Calculate how much ZEC <b>should</b> be mined with a specific hashrate.
@@ -169,9 +194,8 @@
         <h2 style="margin-top: 0px;">Notes</h2>
         <ul>
           <li>This is alpha software. If you see any bugs let me know or better yet <a href="https://github.com/badmofo/zcash-mining-calculator">submit a pull request</a>.</li>
-          <li><b>Calculations are inaccurate insofar as they are based on the instantaneous reward rate which is currently <a href="https://z.cash/blog/slow-start-and-mining-ecosystem.html">increasing linearly</a>.</b>  Some might also argue that ZEC prices will go down as supply increases.</li>
-          <li>Hashrate and Blocktime calculated by looking at the last 72 blocks. The price is from Poloniex. Data is updated every 10 minutes.</li>
-          <li>Blocktime should stablize to 1 block per 2.5 minutes once hashrate stablizes.</li>
+          <li><b>Calculations for each period are slightly inaccurate insofar as they are based on the average of two values: the reward at the beginning of the period and the reward at the end of the period.  The actual reward schedule is <a href="https://z.cash/blog/slow-start-and-mining-ecosystem.html">slightly more complicated</a>.</b>  Also, many would also argue that ZEC prices will go down as supply increases.</li>
+          <li>Hashrate and Blocktime calculated by looking at the last 72 blocks.  The price is from Poloniex. Data is updated every 10 minutes.  Emperical blocktime is used for minute/hour/day/week calculations but the equlibrium blocktime of 150 seconds is used for month/year calculations.</li>
         </ul>
       </div>
     </div>
@@ -192,9 +216,9 @@
 
       var slowStartInterval = 20000;
       var halvingInterval = 840000;
-      var maxBlockSubsidy = 1.25 * 10e9;
+      var maxBlockSubsidy = 1.25 * 1e9;
       var foundersFraction = 0.2;
-      var slowStartShift = slowStartInterval / 2;
+      var slowStartShift = slowStartInterval/2;
       var slowStartRate = maxBlockSubsidy/slowStartInterval;
 
       var halving = function(height) { 
@@ -207,7 +231,7 @@
         } else if ( height < slowStartInterval ) {
           return slowStartRate * (height + 1);
         } else {
-          return maxBlockSubsidy / (1 << halving(height));
+          return Math.floor(maxBlockSubsidy / (1 << halving(height)));
         }
       };
 
@@ -220,26 +244,43 @@
       };
 
       var minerSubsidy = function(height) {
-        return blockSubsidy(height) - foundersReward(height); 
+        return (blockSubsidy(height) - foundersReward(height))/1e8;
+      };
+
+      var avg = function(a, b) {
+        return (a+b)/2.0;
       };
 
       $scope.height = zecStats.height;
-      $scope.minerSubsidy = zecStats.minerSubsidy;
+      //$scope.minerSubsidy = zecStats.minerSubsidy;
       $scope.zecPrice = zecStats.zecPriceBtc * zecStats.btcPriceUsd;
       $scope.netHash = zecStats.netHash;
       $scope.blockTime = zecStats.blockTime;
       $scope.earnings = {};
+      $scope.minerSubsidy = minerSubsidy($scope.height);
+      $scope.userHash = 20;
+
 
       $scope.computeProfits = function() {
+        $scope.minerSubsidy = minerSubsidy($scope.height);
         var userRatio = $scope.userHash / $scope.netHash;
         var blocksPerMin = 60.0 / $scope.blockTime;
         var zecPerMin = blocksPerMin * $scope.minerSubsidy;
+        var blocksPerMinLong = 60.0 / (60 + 60 + 30); // Should settle down to 1 block ever 2.5 mins
+
+        var minerSubsidyHour = avg($scope.minerSubsidy, minerSubsidy($scope.height + 60/2.5));
+        var minerSubsidyDay = avg($scope.minerSubsidy, minerSubsidy($scope.height + (60*24)/2.5));
+        var minerSubsidyWeek = avg($scope.minerSubsidy, minerSubsidy($scope.height + (60*24*7)/2.5));
+        // Linear average isn't appropriate for month/year but whatever for now ...
+        var minerSubsidyMonth = avg($scope.minerSubsidy, minerSubsidy($scope.height + (60*24*30)/2.5));
+        var minerSubsidyYear = avg($scope.minerSubsidy, minerSubsidy($scope.height + (60*24*364)/2.5));
+
         $scope.earnings.min = userRatio * zecPerMin;
-        $scope.earnings.hour = $scope.earnings.min * 60;
-        $scope.earnings.day = $scope.earnings.hour * 24;
-        $scope.earnings.week = $scope.earnings.day * 7;
-        $scope.earnings.month = $scope.earnings.day * 30;
-        $scope.earnings.year = $scope.earnings.day * 365;
+        $scope.earnings.hour = userRatio * blocksPerMin * minerSubsidyHour * 60;
+        $scope.earnings.day = userRatio * blocksPerMin * minerSubsidyDay * 60 * 24;
+        $scope.earnings.week = userRatio * blocksPerMinLong * minerSubsidyWeek * 60 * 24 * 7;
+        $scope.earnings.month = userRatio * blocksPerMinLong * minerSubsidyMonth * 60 * 24 * 30;
+        $scope.earnings.year = userRatio * blocksPerMinLong * minerSubsidyYear * 60 * 24 * 365;
       };
 
       $scope.updateUserHash = function() {
@@ -247,6 +288,8 @@
         $scope.userHash = value;
         $scope.computeProfits();
       };
+
+      $scope.computeProfits();
     }
   </script>
 
