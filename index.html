@@ -212,7 +212,7 @@
       $controllerProvider.allowGlobals();
     }]);
 
-    function MiningCtrl($scope, $http, $log) {
+    function MiningCtrl($scope, $http, $log, $location) {
 
       var slowStartInterval = 20000;
       var halvingInterval = 840000;
@@ -252,14 +252,12 @@
       };
 
       $scope.height = zecStats.height;
-      //$scope.minerSubsidy = zecStats.minerSubsidy;
       $scope.zecPrice = zecStats.zecPriceBtc * zecStats.btcPriceUsd;
       $scope.netHash = zecStats.netHash;
       $scope.blockTime = zecStats.blockTime;
       $scope.earnings = {};
       $scope.minerSubsidy = minerSubsidy($scope.height);
-      $scope.userHash = 20;
-
+      $scope.userHash = $location.search().hashrate || 20;
 
       $scope.computeProfits = function() {
         $scope.minerSubsidy = minerSubsidy($scope.height);
